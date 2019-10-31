@@ -1,0 +1,137 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: sample-app
+
+package:
+  excludeDevDependencies: true
+  exclude:
+    - ./documentation/**
+    - ./.dynamodb/**
+    - ./.vscode/**
+    - ./**/__mocks__/**
+    - ./**/*.test.js
+    - ./**/*.ts
+    - ./**/*.jmx
+    - node_modules/aws-sdk/**
+    - node_modules/prettier/**
+    - node_modules/serverless/**
+    - node_modules/protobufjs/dist/**
+    - node_modules/protobufjs/cli/**
+    - node_modules/**/@types
+    - node_modules/**/*.d.ts
+    - node_modules/**/*.md
+    - node_modules/**/*.js.map
+    - node_modules/**/test/**
+    - node_modules/**/package-lock.json
+    - ./package*.json
+    - ./**/package-lock.json
+    - ./**/yarn.lock
+    - ./**/yarn-error.log
+    - ./**/*.md
+
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  runtime: nodejs10.x
+  memorySize: 128
+  timeout: 4
+  environment:
+    DYNAMODB_OPERATIONLIST_TABLE: ${self:service}-${self:provider.stage}-operation-list
+    SQS_OPERATIONS_QUEUE: ${env:SQS_ENDPOINT, "http://localhost:4576/"}queue/${self:service}-${self:provider.stage}-operation-queue
+
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:BatchWriteItem
+      Resource:
+        - Fn::GetAtt:
+            - operation_list_table
+            - Arn
+
+functions:
+  start_operation:
+    handler: src/operations/start.handler
+    events:
+      - http:
+          path: api/operations
+          method: put
+  operation_processor:
+    handler: src/operations/processor.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - operation_queue
+              - Arn
+
+resources:
+  Resources:
+    operation_list_table:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-operation-list
+        AttributeDefinitions:
+          - AttributeName: operationId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: operationId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+    operation_queue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-operation-queue
+plugins:
+  - serverless-plugin-typescript
+  - serverless-dynamodb-local
+  - serverless-offline-sqs
+  - serverless-offline
+  - serverless-domain-manager
+  - serverless-plugin-split-stacks
+  - serverless-plugin-include-dependencies
+custom:
+  serverless-offline:
+    port: 4000
+    host: 0.0.0.0
+  dynamodb:
+    stages:
+      - dev
+    start:
+      migrate: true
+      port: 4569
+      noStart: true
+  serverless-offline-sqs:
+    autoCreate: true
+    endpoint: http://0.0.0.0:4576
+    region: ${self:provider.region}
+    accessKeyId: root
+    secretAccessKey: root
+  config:
+#    baseDomainName: ${env:BASE_DOMAIN_NAME, "s2.dev.hub.shipworks.com"}
+#    domainName: ${env:DOMAIN_NAME, "${self:provider.stage}.api.admin.${self:custom.config.baseDomainName}"}
+#    certificateArn: ${env:CERTIFICATE_ARN, "arn:aws:acm:us-east-1:741112368367:certificate/f1aa9112-874b-4ce8-a1a4-de7b161e5521"}
+#    readModelSchedule: ${env:ADMIN_READMODEL_SCHEDULE, "rate(1 minute)"}
+#  customDomain:
+#    domainName: ${self:custom.config.domainName}
+#    stage: ${self:provider.stage}
+#    createRoute53Record: true
+#    endpointType: regional
+#    certificateArn: ${self:custom.config.certificateArn}
