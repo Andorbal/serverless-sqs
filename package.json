@@ -11,7 +11,7 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^2.3.3",
     "@typescript-eslint/parser": "^2.3.3",
-    "aws-sdk": "^2.548.0",
+    "aws-sdk": "^2.814.0",
     "concurrently": "^5.0.0",
     "cross-env": "^6.0.3",
     "eslint": "^6.5.1",
